@@ -11,7 +11,7 @@ on:
 jobs:
   release-operator:
     name: release-operator
-    uses: nickjordan/github-actions-operators/.github/workflows/release-operator.yml@master
+    uses: nickjordan/github-workflows-operators/.github/workflows/release-operator.yml@master
     secrets: 
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
