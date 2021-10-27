@@ -1,0 +1,21 @@
+name: push
+on: 
+  push:
+    branches:
+      - master
+      - main
+      - ci-reuseable-actions
+    tags:        
+      - v*
+    
+jobs:
+  release-operator:
+    name: release-operator
+    uses: nickjordan/github-actions-operators/.github/workflows/release-operator.yml@master
+    secrets: 
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+      IMAGE_REPOSITORY: ${{ secrets.IMAGE_REPOSITORY }}
+    with: 
+      BUILD_PLATFORMS: "linux/amd64,linux/arm64,linux/ppc64le"
+      PR_ACTOR: "nick@nljordan.com"
