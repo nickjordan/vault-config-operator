@@ -4,7 +4,7 @@ on:
     branches:
       - master
       - main
-      - ci-reuseable-actions
+      - ci-reusable-actions
  
 jobs:
 # Call reusable workflow in same org
