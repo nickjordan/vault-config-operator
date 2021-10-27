@@ -15,8 +15,8 @@ jobs:
     secrets: 
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
-      OPERATOR_IMAGE_REPOISITORY: ${{ secrets.OPERATOR_IMAGE_REPOSITORY }}
-      BUNDLE_IMAGE_REPOISITORY: ${{ secrets.BUNDLE_IMAGE_REPOSITORY }}
+      OPERTATOR_IMAGE_REPOSITORY: ${{ secrets.OPERATOR_IMAGE_REPOSITORY }}
+      BUNDLE_IMAGE_REPOSITORY: ${{ secrets.BUNDLE_IMAGE_REPOSITORY }}
     with: 
       BUILD_PLATFORMS: "linux/amd64,linux/arm64,linux/ppc64le"
       PR_ACTOR: "nick@nicks.world.com"
