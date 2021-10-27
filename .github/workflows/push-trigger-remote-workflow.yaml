@@ -5,7 +5,9 @@ on:
       - master
       - main
       - ci-reusable-actions
- 
+     tags:
+      - v*
+
 jobs:
 # Call reusable workflow in same org
   release-operator:
