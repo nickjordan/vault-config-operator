@@ -1,4 +1,4 @@
-name: push
+name: push-trigger-release-operator
 on: 
   push:
     branches:
@@ -9,7 +9,6 @@ on:
       - v*
 
 jobs:
-# Call reusable workflow in same org
   release-operator:
     name: release-operator
     uses: nickjordan/github-workflows-operators/.github/workflows/release-operator.yml@main
@@ -19,4 +18,4 @@ jobs:
       IMAGE_REPOSITORY: ${{ secrets.IMAGE_REPOSITORY }}
     with: 
       BUILD_PLATFORMS: "linux/amd64,linux/arm64,linux/ppc64le"
-      PR_ACTOR: "nick@nljordan.com"
+      PR_ACTOR: "nick@nicks.world.com"
