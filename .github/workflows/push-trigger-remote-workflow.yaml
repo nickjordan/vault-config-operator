@@ -5,7 +5,7 @@ on:
       - master
       - main
       - ci-reusable-actions
-     tags:
+    tags:
       - v*
 
 jobs:
