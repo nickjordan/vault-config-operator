@@ -5,8 +5,6 @@ on:
       - master
       - main
       - ci-reuseable-actions
-    tags:        
-      - v*
  
 jobs:
 # Call reusable workflow in same org
