@@ -5,6 +5,7 @@ on:
       - master
       - main
       - ci-reuseable-actions
+      - test
     tags:        
       - v*
     
