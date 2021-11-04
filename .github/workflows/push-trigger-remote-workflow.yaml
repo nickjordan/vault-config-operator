@@ -8,10 +8,10 @@ on:
     tags:
       - v*    
       
-jobs:
+jobs:  
   release-operator:
     name: release-operator
-    uses: nickjordan/github-workflows-operators/.github/workflows/release-${{ inputs.WORKFLOW }}.yml@main
+    uses: nickjordan/github-workflows-operators/.github/workflows/release-operator.yml@main
     secrets: 
       COMMUNITY_OPERATOR_PAT: ${{ secrets.COMMUNITY_OPERATOR_PAT }}
       BUNDLE_IMAGE_REPOSITORY: ${{ secrets.BUNDLE_IMAGE_REPOSITORY }}
@@ -21,5 +21,4 @@ jobs:
     with: 
       BUILD_PLATFORMS: "linux/amd64,linux/arm64,linux/ppc64le"
       PR_ACTOR: "nick@nljordan.com"
-      WORKFLOW: "operator2"
       
