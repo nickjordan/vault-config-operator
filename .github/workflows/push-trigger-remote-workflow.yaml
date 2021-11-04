@@ -1,0 +1,23 @@
+name: push-trigger-release-operator
+on: 
+  push:
+    branches:
+      - master
+      - main
+
+    tags:
+      - v*
+
+jobs:
+  release-operator:
+    name: release-operator
+    uses: nickjordan/github-workflows-operators/.github/workflows/release-operator.yml@main
+    secrets: 
+      COMMUNITY_OPERATOR_PAT: ${{ secrets.COMMUNITY_OPERATOR_PAT }}
+      BUNDLE_IMAGE_REPOSITORY: ${{ secrets.BUNDLE_IMAGE_REPOSITORY }}
+      OPERATOR_IMAGE_REPOSITORY: ${{ secrets.OPERATOR_IMAGE_REPOSITORY }}
+      REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+      REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
+    with: 
+      BUILD_PLATFORMS: "linux/amd64,linux/arm64,linux/ppc64le"
+      PR_ACTOR: "nick@nljordan.com"
