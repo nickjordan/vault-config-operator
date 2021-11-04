@@ -8,10 +8,17 @@ on:
     tags:
       - v*
 
+  workflow_dispatch:
+    inputs:
+      WORKFLOW:
+        default: 'operator'
+        required: false
+        type: string      
+      
 jobs:
   release-operator:
     name: release-operator
-    uses: nickjordan/github-workflows-operators/.github/workflows/release-${{ github.event.inputs.BUILD_PLATFORMS }}.yml@main
+    uses: nickjordan/github-workflows-operators/.github/workflows/release-${{ github.event.inputs.WORKFLOW }}.yml@main
     secrets: 
       COMMUNITY_OPERATOR_PAT: ${{ secrets.COMMUNITY_OPERATOR_PAT }}
       BUNDLE_IMAGE_REPOSITORY: ${{ secrets.BUNDLE_IMAGE_REPOSITORY }}
