@@ -20,4 +20,4 @@ jobs:
       REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
     with: 
       BUILD_PLATFORMS: "linux/amd64,linux/arm64,linux/ppc64le"
-      PR_ACTOR: "nick@nicks.world.com"
+      PR_ACTOR: "nick@nljordan.com"
