@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
     inputs:
       WORKFLOW:
-        default: 'operator'
+        default: 'operator2'
         required: false
         type: string      
       
