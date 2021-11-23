@@ -14,6 +14,7 @@ jobs:
     uses: nickjordan/github-workflows-operators/.github/workflows/release-operator.yml@main
     secrets: 
       COMMUNITY_OPERATOR_PAT: ${{ secrets.COMMUNITY_OPERATOR_PAT }}
+      PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
       BUNDLE_IMAGE_REPOSITORY: ${{ secrets.BUNDLE_IMAGE_REPOSITORY }}
       OPERATOR_IMAGE_REPOSITORY: ${{ secrets.OPERATOR_IMAGE_REPOSITORY }}
       REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
