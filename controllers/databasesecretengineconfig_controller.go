@@ -49,8 +49,9 @@ type DatabaseSecretEngineConfigReconciler struct {
 //+kubebuilder:rbac:groups=redhatcop.redhat.io,resources=databasesecretengineconfigs,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=redhatcop.redhat.io,resources=databasesecretengineconfigs/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=redhatcop.redhat.io,resources=databasesecretengineconfigs/finalizers,verbs=update
-//+kubebuilder:rbac:groups=core,resources=serviceaccounts;secrets,verbs=get;list;watch
 //+kubebuilder:rbac:groups=redhatcop.redhat.io,resources=databasesecretengineconfigs;randomsecrets,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch
+//+kubebuilder:rbac:groups="",resources=serviceaccounts/token,verbs=create
 //+kubebuilder:rbac:groups="",resources=events,verbs=get;list;watch;create;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
@@ -79,16 +80,15 @@ func (r *DatabaseSecretEngineConfigReconciler) Reconcile(ctx context.Context, re
 		return reconcile.Result{}, err
 	}
 
-	ctx = context.WithValue(ctx, "kubeClient", r.GetClient())
-	vaultClient, err := instance.Spec.Authentication.GetVaultClient(ctx, instance.Namespace)
+	ctx1, err := prepareContext(ctx, r.ReconcilerBase, instance)
 	if err != nil {
-		r.Log.Error(err, "unable to create vault client", "instance", instance)
+		r.Log.Error(err, "unable to prepare context", "instance", instance)
 		return r.ManageError(ctx, instance, err)
 	}
-	ctx = context.WithValue(ctx, "vaultClient", vaultClient)
+
 	vaultResource := vaultresourcecontroller.NewVaultResource(&r.ReconcilerBase, instance)
 
-	return vaultResource.Reconcile(ctx, instance)
+	return vaultResource.Reconcile(ctx1, instance)
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -158,7 +158,7 @@ func (r *DatabaseSecretEngineConfigReconciler) SetupWithManager(mgr ctrl.Manager
 		For(&redhatcopv1alpha1.DatabaseSecretEngineConfig{}).
 		Watches(&source.Kind{Type: &corev1.Secret{
 			TypeMeta: metav1.TypeMeta{
-				Kind: "Namespace",
+				Kind: "Secret",
 			},
 		}}, handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
 			res := []reconcile.Request{}
@@ -180,7 +180,7 @@ func (r *DatabaseSecretEngineConfigReconciler) SetupWithManager(mgr ctrl.Manager
 		}), builder.WithPredicates(isBasicAuthSecret)).
 		Watches(&source.Kind{Type: &redhatcopv1alpha1.RandomSecret{
 			TypeMeta: metav1.TypeMeta{
-				Kind: "Namespace",
+				Kind: "RandomSecret",
 			},
 		}}, handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
 			res := []reconcile.Request{}

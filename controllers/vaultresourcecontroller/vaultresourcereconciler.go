@@ -20,8 +20,9 @@ import (
 	"context"
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
-	redhatcopv1alpha1 "github.com/redhat-cop/vault-config-operator/api/v1alpha1"
+	"github.com/redhat-cop/operator-utils/pkg/util/apis"
 	vaultutils "github.com/redhat-cop/vault-config-operator/api/v1alpha1/utils"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
@@ -44,7 +45,7 @@ func (r *VaultResource) Reconcile(ctx context.Context, instance client.Object) (
 	log := log.FromContext(ctx)
 
 	if util.IsBeingDeleted(instance) {
-		if !util.HasFinalizer(instance, redhatcopv1alpha1.GetFinalizer(instance)) {
+		if !util.HasFinalizer(instance, vaultutils.GetFinalizer(instance)) {
 			return reconcile.Result{}, nil
 		}
 		err := r.manageCleanUpLogic(ctx, instance)
@@ -52,7 +53,7 @@ func (r *VaultResource) Reconcile(ctx context.Context, instance client.Object) (
 			log.Error(err, "unable to delete instance", "instance", instance)
 			return r.reconcilerBase.ManageError(ctx, instance, err)
 		}
-		util.RemoveFinalizer(instance, redhatcopv1alpha1.GetFinalizer(instance))
+		util.RemoveFinalizer(instance, vaultutils.GetFinalizer(instance))
 		err = r.reconcilerBase.GetClient().Update(ctx, instance)
 		if err != nil {
 			log.Error(err, "unable to update instance", "instance", instance)
@@ -72,10 +73,16 @@ func (r *VaultResource) Reconcile(ctx context.Context, instance client.Object) (
 
 func (r *VaultResource) manageCleanUpLogic(context context.Context, instance client.Object) error {
 	log := log.FromContext(context)
-	err := r.vaultEndpoint.DeleteIfExists(context)
-	if err != nil {
-		log.Error(err, "unable to delete vault resource", "instance", instance)
-		return err
+	if conditionAware, ok := instance.(apis.ConditionsAware); ok {
+		for _, condition := range conditionAware.GetConditions() {
+			if condition.Status == metav1.ConditionTrue && condition.Type == apis.ReconcileSuccess {
+				err := r.vaultEndpoint.DeleteIfExists(context)
+				if err != nil {
+					log.Error(err, "unable to delete vault resource", "instance", instance)
+					return err
+				}
+			}
+		}
 	}
 	return nil
 }

@@ -8,5 +8,21 @@ resources:
 - redhatcop_v1alpha1_randomsecret.yaml
 - redhatcop_v1alpha1_authenginemount.yaml
 - redhatcop_v1alpha1_kubernetesauthengineconfig.yaml
+- redhatcop_v1alpha1_vaultsecret.yaml
 - redhatcop_v1alpha1_passwordpolicy.yaml
+- redhatcop_v1alpha1_githubsecretengineconfig.yaml
+- redhatcop_v1alpha1_githubsecretenginerole.yaml
+- redhatcop_v1alpha1_rabbitmqsecretengineconfig.yaml
+- redhatcop_v1alpha1_rabbitmqsecretenginerole.yaml
+- redhatcop_v1alpha1_pkisecretengineconfig.yaml
+- redhatcop_v1alpha1_pkisecretenginerole.yaml
+- redhatcop_v1alpha1_quaysecretengineconfig.yaml
+- redhatcop_v1alpha1_quaysecretenginerole.yaml
+- redhatcop_v1alpha1_quaysecretenginestaticrole.yaml
+- redhatcop_v1alpha1_ldapauthengineconfig.yaml
+- redhatcop_v1alpha1_ldapauthenginegroup.yaml
+- redhatcop_v1alpha1_kubernetessecretengineconfig.yaml
+- redhatcop_v1alpha1_kubernetessecretenginerole.yaml
+- redhatcop_v1alpha1_jwtoidcauthengineconfig.yaml
+- redhatcop_v1alpha1_jwtoidcauthenginerole.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

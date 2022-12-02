@@ -19,6 +19,7 @@ package v1alpha1
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/rand"
 	"time"
 
@@ -41,19 +42,19 @@ type RandomSecretSpec struct {
 
 	// Authentication is the kube aoth configuraiton to be used to execute this request
 	// +kubebuilder:validation:Required
-	Authentication KubeAuthConfiguration `json:"authentication,omitempty"`
+	Authentication vaultutils.KubeAuthConfiguration `json:"authentication,omitempty"`
 
 	// Path at which to create the secret.
 	// The final path will be {[spec.authentication.namespace]}/{spec.path}/{metadata.name}.
 	// The authentication role must have the following capabilities = [ "create", "update", "delete"] on that path.
 	// +kubebuilder:validation:Required
-	Path Path `json:"path,omitempty"`
+	Path vaultutils.Path `json:"path,omitempty"`
 
 	// SecretFormat specifies a map of key and password policies used to generate random values
 	// +kubebuilder:validation:Required
 	SecretFormat VaultPasswordPolicy `json:"secretFormat,omitempty"`
 
-	// RefreshPeriod if specified, the operator will refresh the secret with the given frequency
+	// RefreshPeriod if specified, the operator will refresh the secret with the given frequency. This will also set the ttl of the secret which provides a hint for how often consumers should check back for a new value when reading the secret's lease_duration.
 	// +kubebuilder:validation:Optional
 	RefreshPeriod *metav1.Duration `json:"refreshPeriod,omitempty"`
 
@@ -62,18 +63,43 @@ type RandomSecretSpec struct {
 	SecretKey string `json:"secretKey,omitempty"`
 
 	calculatedSecret string `json:"-"`
+
+	// IsKVSecretsEngineV2 indicates if the KV Secrets engine is V2 or not. Default is false to indicate the payload to send is for KV Secret Engine V1.
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default=false
+	IsKVSecretsEngineV2 bool `json:"isKVSecretsEngineV2,omitempty"`
 }
+
+const ttlKey string = "ttl"
 
 var _ vaultutils.VaultObject = &RandomSecret{}
 
 func (d *RandomSecret) GetPath() string {
 	return string(d.Spec.Path) + "/" + d.Name
 }
-func (d *RandomSecret) GetPayload() map[string]interface{} {
-	return map[string]interface{}{
+
+func (d *RandomSecret) getV1Payload() map[string]interface{} {
+
+	payload := map[string]interface{}{
 		d.Spec.SecretKey: d.Spec.calculatedSecret,
 	}
+
+	if d.Spec.RefreshPeriod != nil && d.Spec.RefreshPeriod.Duration > 0 {
+		payload[ttlKey] = d.Spec.RefreshPeriod.Duration.String()
+	}
+
+	return payload
 }
+
+func (d *RandomSecret) GetPayload() map[string]interface{} {
+	if d.Spec.IsKVSecretsEngineV2 {
+		return map[string]interface{}{
+			"data": d.getV1Payload(),
+		}
+	}
+	return d.getV1Payload()
+}
+
 func (d *RandomSecret) IsEquivalentToDesiredState(payload map[string]interface{}) bool {
 	return false
 }
@@ -179,7 +205,7 @@ func (d *RandomSecret) GenerateNewPassword(context context.Context) error {
 			return nil
 		}
 	}
-	return errors.New("no passowrd policy method specified")
+	return errors.New("no password policy method specified")
 }
 
 func (d *RandomSecret) calculateSecret(policy *PasswordPolicyFormat, attempts int) bool {
@@ -247,6 +273,7 @@ func (r *RandomSecret) isValid() error {
 	result := &multierror.Error{}
 	result = multierror.Append(result, r.validateEitherPasswordPolicyReferenceOrInline())
 	result = multierror.Append(result, r.validateInlinePasswordPolicyFormat())
+	result = multierror.Append(result, r.validateSecretKey())
 	return result.ErrorOrNil()
 }
 
@@ -270,4 +297,15 @@ func (r *RandomSecret) validateInlinePasswordPolicyFormat() error {
 		return hclsimple.Decode(r.Spec.SecretKey, []byte(r.Spec.SecretFormat.InlinePasswordPolicy), nil, passwordPolicyFormat)
 	}
 	return nil
+}
+
+func (r *RandomSecret) validateSecretKey() error {
+	if r.Spec.RefreshPeriod != nil && r.Spec.RefreshPeriod.Duration > 0 && r.Spec.SecretKey == ttlKey {
+		return fmt.Errorf("secretKey must not be %v since this is a protected key when RefreshPeriod is set", ttlKey)
+	}
+	return nil
+}
+
+func (d *RandomSecret) GetKubeAuthConfiguration() *vaultutils.KubeAuthConfiguration {
+	return &d.Spec.Authentication
 }

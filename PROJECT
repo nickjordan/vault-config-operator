@@ -115,7 +115,215 @@ resources:
   controller: true
   domain: redhat.io
   group: redhatcop
+  kind: VaultSecret
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
   kind: PasswordPolicy
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: GitHubSecretEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: GitHubSecretEngineRole
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: RabbitMQSecretEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: RabbitMQSecretEngineRole
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: PKISecretEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: PKISecretEngineRole
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: QuaySecretEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: QuaySecretEngineRole
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: QuaySecretEngineStaticRole
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: LDAPAuthEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: LDAPAuthEngineGroup
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: KubernetesSecretEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: KubernetesSecretEngineRole
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: JWTOIDCAuthEngineConfig
+  path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
+  version: v1alpha1
+  webhooks:
+    defaulting: true
+    validation: true
+    webhookVersion: v1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: redhat.io
+  group: redhatcop
+  kind: JWTOIDCAuthEngineRole
   path: github.com/redhat-cop/vault-config-operator/api/v1alpha1
   version: v1alpha1
   webhooks:

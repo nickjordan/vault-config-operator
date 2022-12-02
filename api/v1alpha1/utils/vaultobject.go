@@ -32,6 +32,7 @@ type VaultObject interface {
 	IsInitialized() bool
 	IsValid() (bool, error)
 	PrepareInternalValues(context context.Context, object client.Object) error
+	GetKubeAuthConfiguration() *KubeAuthConfiguration
 }
 
 type VaultEndpoint struct {
@@ -79,4 +80,46 @@ func (ve *VaultEndpoint) CreateOrUpdate(context context.Context) error {
 		}
 	}
 	return nil
+}
+
+type RabbitMQEngineConfigVaultObject interface {
+	VaultObject
+	GetLeasePath() string
+	GetLeasePayload() map[string]interface{}
+	CheckTTLValuesProvided() bool
+}
+
+type RabbitMQEngineConfigVaultEndpoint struct {
+	rabbitMQEngineConfigVaultEndpoint RabbitMQEngineConfigVaultObject
+}
+
+func (ve *RabbitMQEngineConfigVaultEndpoint) CreateOrUpdateLease(context context.Context) error {
+	log := log.FromContext(context)
+	// Skip lease configuration if no values provided
+	if ve.rabbitMQEngineConfigVaultEndpoint.CheckTTLValuesProvided() {
+		return nil
+	}
+	currentPayload, found, err := read(context, ve.rabbitMQEngineConfigVaultEndpoint.GetLeasePath())
+	if err != nil {
+		log.Error(err, "unable to read object at", "path", ve.rabbitMQEngineConfigVaultEndpoint.GetLeasePath())
+		return err
+	}
+	if !found {
+		return write(context, ve.rabbitMQEngineConfigVaultEndpoint.GetLeasePath(), ve.rabbitMQEngineConfigVaultEndpoint.GetLeasePayload())
+	} else {
+		if !ve.rabbitMQEngineConfigVaultEndpoint.IsEquivalentToDesiredState(currentPayload) {
+			return write(context, ve.rabbitMQEngineConfigVaultEndpoint.GetLeasePath(), ve.rabbitMQEngineConfigVaultEndpoint.GetLeasePayload())
+		}
+	}
+	return nil
+}
+
+func (ve *RabbitMQEngineConfigVaultEndpoint) Create(context context.Context) error {
+	return write(context, ve.rabbitMQEngineConfigVaultEndpoint.GetPath(), ve.rabbitMQEngineConfigVaultEndpoint.GetPayload())
+}
+
+func NewRabbitMQEngineConfigVaultEndpoint(obj client.Object) *RabbitMQEngineConfigVaultEndpoint {
+	return &RabbitMQEngineConfigVaultEndpoint{
+		rabbitMQEngineConfigVaultEndpoint: obj.(RabbitMQEngineConfigVaultObject),
+	}
 }

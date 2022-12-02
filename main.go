@@ -33,6 +33,8 @@ import (
 
 	"github.com/redhat-cop/operator-utils/pkg/util"
 
+	"sigs.k8s.io/controller-runtime/pkg/webhook"
+
 	redhatcopv1alpha1 "github.com/redhat-cop/vault-config-operator/api/v1alpha1"
 	"github.com/redhat-cop/vault-config-operator/controllers"
 	//+kubebuilder:scaffold:imports
@@ -146,12 +148,153 @@ func main() {
 		setupLog.Error(err, "unable to create controller", "controller", "KubernetesAuthEngineConfig")
 		os.Exit(1)
 	}
+
+	if err = (&controllers.LDAPAuthEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("LDAPAuthEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("LDAPAuthEngineConfig"),
+		ControllerName: "LDAPAuthEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "LDAPAuthEngineConfig")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.LDAPAuthEngineGroupReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("LDAPAuthEngineGroup"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("LDAPAuthEngineGroup"),
+		ControllerName: "LDAPAuthEngineGroup",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "LDAPAuthEngineGroup")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.JWTOIDCAuthEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("JWTOIDCAuthEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("JWTOIDCAuthEngineConfig"),
+		ControllerName: "JWTOIDCAuthEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "JWTOIDCAuthEngineConfig")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.JWTOIDCAuthEngineRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("JWTOIDCAuthEngineRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("JWTOIDCAuthEngineRole"),
+		ControllerName: "JWTOIDCAuthEngineRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "JWTOIDCAuthEngineRole")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.VaultSecretReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("VaultSecret"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("VaultSecret"),
+		ControllerName: "VaultSecret",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "VaultSecret")
+		os.Exit(1)
+	}
 	if err = (&controllers.PasswordPolicyReconciler{
 		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("PasswordPolicy"), mgr.GetAPIReader()),
 		Log:            ctrl.Log.WithName("controllers").WithName("PasswordPolicy"),
 		ControllerName: "PasswordPolicy",
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "PasswordPolicy")
+		os.Exit(1)
+	}
+	if err = (&controllers.RabbitMQSecretEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("RabbitMQSecretEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("RabbitMQSecretEngineConfig"),
+		ControllerName: "RabbitMQSecretEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RabbitMQSecretEngineConfig")
+		os.Exit(1)
+	}
+	if err = (&controllers.RabbitMQSecretEngineRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("RabbitMQSecretEngineRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("RabbitMQSecretEngineRole"),
+		ControllerName: "RabbitMQSecretEngineRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "RabbitMQSecretEngineRole")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.PKISecretEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("PKISecretEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("PKISecretEngineConfig"),
+		ControllerName: "PKISecretEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PKISecretEngineConfig")
+		os.Exit(1)
+	}
+	if err = (&controllers.PKISecretEngineRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("PKISecretEngineRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("PKISecretEngineRole"),
+		ControllerName: "PKISecretEngineRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "PKISecretEngineRole")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.GitHubSecretEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("GitHubSecretEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("GitHubSecretEngineConfig"),
+		ControllerName: "GitHubSecretEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GitHubSecretEngineConfig")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.GitHubSecretEngineRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("GitHubSecretEngineRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("GitHubSecretEngineRole"),
+		ControllerName: "GitHubSecretEngineRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "GitHubSecretEngineRole")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.QuaySecretEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("QuaySecretEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("QuaySecretEngineConfig"),
+		ControllerName: "QuaySecretEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "QuaySecretEngineConfig")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.QuaySecretEngineRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("QuaySecretEngineRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("QuaySecretEngineRole"),
+		ControllerName: "QuaySecretEngineRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "QuaySecretEngineRole")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.QuaySecretEngineStaticRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("QuaySecretEngineStaticRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("QuaySecretEngineStaticRole"),
+		ControllerName: "QuaySecretEngineStaticRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "QuaySecretEngineStaticRole")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.KubernetesSecretEngineConfigReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("KubernetesSecretEngineConfig"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("KubernetesSecretEngineConfig"),
+		ControllerName: "KubernetesSecretEngineConfig",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KubernetesSecretEngineConfig")
+		os.Exit(1)
+	}
+
+	if err = (&controllers.KubernetesSecretEngineRoleReconciler{
+		ReconcilerBase: util.NewReconcilerBase(mgr.GetClient(), mgr.GetScheme(), mgr.GetConfig(), mgr.GetEventRecorderFor("KubernetesSecretEngineRole"), mgr.GetAPIReader()),
+		Log:            ctrl.Log.WithName("controllers").WithName("KubernetesSecretEngineRole"),
+		ControllerName: "KubernetesSecretEngineRole",
+	}).SetupWithManager(mgr); err != nil {
+		setupLog.Error(err, "unable to create controller", "controller", "KubernetesSecretEngineRole")
 		os.Exit(1)
 	}
 
@@ -184,6 +327,26 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "KubernetesAuthEngineConfig")
 			os.Exit(1)
 		}
+		if err = (&redhatcopv1alpha1.LDAPAuthEngineConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "LDAPAuthEngineConfig")
+			os.Exit(1)
+		}
+		if err = (&redhatcopv1alpha1.LDAPAuthEngineGroup{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "LDAPAuthEngineGroup")
+			os.Exit(1)
+		}
+		if err = (&redhatcopv1alpha1.JWTOIDCAuthEngineConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "JWTOIDCAuthEngineConfig")
+			os.Exit(1)
+		}
+		if err = (&redhatcopv1alpha1.JWTOIDCAuthEngineRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "JWTOIDCAuthEngineRole")
+			os.Exit(1)
+		}
+		if err = (&redhatcopv1alpha1.VaultSecret{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "VaultSecret")
+			os.Exit(1)
+		}
 		if err = (&redhatcopv1alpha1.PasswordPolicy{}).SetupWebhookWithManager(mgr); err != nil {
 			setupLog.Error(err, "unable to create webhook", "webhook", "PasswordPolicy")
 			os.Exit(1)
@@ -192,6 +355,57 @@ func main() {
 			setupLog.Error(err, "unable to create webhook", "webhook", "Policy")
 			os.Exit(1)
 		}
+		if err = (&redhatcopv1alpha1.GitHubSecretEngineConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "GitHubSecretEngineConfig")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.GitHubSecretEngineRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "GitHubSecretEngineRole")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.PKISecretEngineConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "PKISecretEngineConfig")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.PKISecretEngineRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "PKISecretEngineRole")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.RabbitMQSecretEngineRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "RabbitMQSecretEngineRole")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.QuaySecretEngineConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "QuaySecretEngineConfig")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.QuaySecretEngineRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "QuaySecretEngineRole")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.QuaySecretEngineStaticRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "QuaySecretEngineStaticRole")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.KubernetesSecretEngineConfig{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "KubernetesSecretEngineConfig")
+			os.Exit(1)
+		}
+
+		if err = (&redhatcopv1alpha1.KubernetesSecretEngineRole{}).SetupWebhookWithManager(mgr); err != nil {
+			setupLog.Error(err, "unable to create webhook", "webhook", "KubernetesSecretEngineRole")
+			os.Exit(1)
+		}
+
+		mgr.GetWebhookServer().Register("/validate-redhatcop-redhat-io-v1alpha1-rabbitmqsecretengineconfig", &webhook.Admission{Handler: &redhatcopv1alpha1.RabbitMQSecretEngineConfigValidation{Client: mgr.GetClient()}})
 	}
 
 	//+kubebuilder:scaffold:builder

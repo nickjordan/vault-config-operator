@@ -36,38 +36,25 @@ type KubernetesAuthEngineRoleSpec struct {
 
 	// Authentication is the kube aoth configuraiton to be used to execute this request
 	// +kubebuilder:validation:Required
-	Authentication KubeAuthConfiguration `json:"authentication,omitempty"`
+	Authentication vaultutils.KubeAuthConfiguration `json:"authentication,omitempty"`
 
 	// Path at which to make the configuration.
 	// The final path will be {[spec.authentication.namespace]}/auth/{spec.path}/role/{metadata.name}.
 	// The authentication role must have the following capabilities = [ "create", "read", "update", "delete"] on that path.
 	// +kubebuilder:validation:Required
-	Path Path `json:"path,omitempty"`
+	Path vaultutils.Path `json:"path,omitempty"`
 
 	VRole `json:",inline"`
 
 	// TargetNamespaces specifies how to retrieve the namespaces bound to this Vault role.
 	// +kubebuilder:validation:Required
-	TargetNamespaces TargetNamespaceConfig `json:"targetNamespaces,omitempty"`
-}
-
-type TargetNamespaceConfig struct {
-	// TargetNamespaceSelector is a selector of namespaces from which service accounts will receove this role. Either TargetNamespaceSelector or TargetNamespaces can be specified
-	// +kubebuilder:validation:Optional
-	TargetNamespaceSelector *metav1.LabelSelector `json:"targetNamespaceSelector,omitempty"`
-
-	// TargetNamespaces is a list of namespace from which service accounts will receive this role. Either TargetNamespaceSelector or TargetNamespaces can be specified.
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:MinItems=1
-	// kubebuilder:validation:UniqueItems=true
-	// +listType=set
-	TargetNamespaces []string `json:"targetNamespaces,omitempty"`
+	TargetNamespaces vaultutils.TargetNamespaceConfig `json:"targetNamespaces,omitempty"`
 }
 
 var _ vaultutils.VaultObject = &KubernetesAuthEngineRole{}
 
 func (d *KubernetesAuthEngineRole) GetPath() string {
-	return cleansePath("auth/" + string(d.Spec.Path) + "/role/" + d.Name)
+	return vaultutils.CleansePath("auth/" + string(d.Spec.Path) + "/role/" + d.Name)
 }
 func (d *KubernetesAuthEngineRole) GetPayload() map[string]interface{} {
 	return d.Spec.VRole.toMap()
@@ -89,7 +76,12 @@ func (d *KubernetesAuthEngineRole) PrepareInternalValues(context context.Context
 			log.Error(err, "unable to retrieve selected namespaces", "instance", object)
 			return err
 		}
-		d.SetInternalNamespaces(namespaces)
+		if len(namespaces) < 1 {
+			// workaround for when there are no namespace, as we don't want this call to error out
+			d.SetInternalNamespaces([]string{"__no_namespace__"})
+		} else {
+			d.SetInternalNamespaces(namespaces)
+		}
 	} else {
 		d.SetInternalNamespaces(d.Spec.TargetNamespaces.TargetNamespaces)
 	}
@@ -127,7 +119,6 @@ func (r *KubernetesAuthEngineRole) IsValid() (bool, error) {
 type VRole struct {
 
 	// TargetServiceAccounts is a list of service account names that will receive this role
-	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:MinItems=1
 	// kubebuilder:validation:UniqueItems=true
 	// +kubebuilder:default={"default"}
@@ -268,4 +259,8 @@ func (r *KubernetesAuthEngineRole) validateEitherTargetNamespaceSelectorOrTarget
 		return errors.New("Only one of TargetNamespaceSelector or TargetNamespaces can be specified.")
 	}
 	return nil
+}
+
+func (d *KubernetesAuthEngineRole) GetKubeAuthConfiguration() *vaultutils.KubeAuthConfiguration {
+	return &d.Spec.Authentication
 }

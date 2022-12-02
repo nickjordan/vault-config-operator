@@ -1,6 +1,11 @@
 CHART_REPO_URL ?= http://example.com
 HELM_REPO_DEST ?= /tmp/gh-pages
 OPERATOR_NAME ?=$(shell basename -z `pwd`)
+HELM_VERSION ?= v3.8.0
+KIND_VERSION ?= v0.11.1
+KUBECTL_VERSION ?= v1.21.1
+K8S_MAJOR_VERSION ?= 1.21
+VAULT_VERSION ?= 1.9.3
 
 # VERSION defines the project version for the bundle.
 # Update this value when you upgrade the version of your project.
@@ -33,7 +38,18 @@ BUNDLE_METADATA_OPTS ?= $(BUNDLE_CHANNELS) $(BUNDLE_DEFAULT_CHANNEL)
 #
 # For example, running 'make bundle-build bundle-push catalog-build catalog-push' will build and push both
 # redhat.io/vault-config-operator-bundle:$VERSION and redhat.io/vault-config-operator-catalog:$VERSION.
-IMAGE_TAG_BASE ?= redhat.io/vault-config-operator
+IMAGE_TAG_BASE ?= quay.io/redhat-cop/$(OPERATOR_NAME)
+
+# BUNDLE_GEN_FLAGS are the flags passed to the operator-sdk generate bundle command
+BUNDLE_GEN_FLAGS ?= -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+
+# USE_IMAGE_DIGESTS defines if images are resolved via tags or digests
+# You can enable this value if you would like to use SHA Based Digests
+# To enable set flag to true
+USE_IMAGE_DIGESTS ?= false
+ifeq ($(USE_IMAGE_DIGESTS), true)
+	BUNDLE_GEN_FLAGS += --use-image-digests
+endif
 
 # BUNDLE_IMG defines the image:tag used for the bundle.
 # You can use it as an arg. (E.g make bundle-build BUNDLE_IMG=<some-registry>/<project-name-bundle>:<tag>)
@@ -44,7 +60,7 @@ IMG ?= controller:latest
 # Produce CRDs that work back to Kubernetes 1.11 (no version conversion)
 CRD_OPTIONS ?= "crd:trivialVersions=true,preserveUnknownFields=false"
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.21
+ENVTEST_K8S_VERSION = 1.24.1
 
 # Get the currently used golang install path (in GOPATH/bin, unless GOBIN is set)
 ifeq (,$(shell go env GOBIN))
@@ -59,6 +75,7 @@ endif
 SHELL = /usr/bin/env bash -o pipefail
 .SHELLFLAGS = -ec
 
+.PHONY: all
 all: build
 
 ##@ General
@@ -74,87 +91,156 @@ all: build
 # More info on the awk command:
 # http://linuxcommand.org/lc3_adv_awk.php
 
+.PHONY: help
 help: ## Display this help.
 	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9-]+:.*?##/ { printf "  \033[36m%-15s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
 
 ##@ Development
 
+.PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) $(CRD_OPTIONS) rbac:roleName=manager-role webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
+.PHONY: generate
 generate: controller-gen ## Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
 	$(CONTROLLER_GEN) object:headerFile="hack/boilerplate.go.txt" paths="./..."
 
+.PHONY: fmt
 fmt: ## Run go fmt against code.
 	go fmt ./...
 
+.PHONY: vet
 vet: ## Run go vet against code.
 	go vet ./...
 
+.PHONY: test
 test: manifests generate fmt vet envtest ## Run tests.
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out
 
+.PHONY: integration
+integration: kind-setup deploy-vault deploy-ingress vault manifests generate fmt vet envtest ## Run tests.
+	export VAULT_TOKEN=$$($(KUBECTL) get secret vault-init -n vault -o jsonpath='{.data.root_token}' | base64 -d) ;\
+	export VAULT_ADDR="http://localhost:8081" ;\
+	export ACCESSOR=$$($(VAULT) read -tls-skip-verify -format json sys/auth | jq -r '.data["kubernetes/"].accessor') ;\
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) -p path)" go test ./... -coverprofile cover.out --tags=integration
+
+.PHONY: deploy-ingress
+deploy-ingress: kubectl helm
+	$(HELM) upgrade -i ingress-nginx ./integration/helm/ingress-nginx -n vault --atomic --create-namespace
+	curl https://raw.githubusercontent.com/kubernetes/ingress-nginx/main/deploy/static/provider/kind/deploy.yaml | $(KUBECTL) create -f - -n ingress-nginx
+	$(KUBECTL) rollout status deployment ingress-nginx-controller -n ingress-nginx --timeout=90s
+	$(KUBECTL) wait --namespace ingress-nginx --for=condition=ready pod --selector=app.kubernetes.io/component=controller --timeout=90s
+
+.PHONY: deploy-vault
+deploy-vault: kubectl helm
+	$(KUBECTL) create namespace vault --dry-run=client -o yaml | kubectl apply -f - 
+	$(KUBECTL) apply -f ./integration/rolebinding-admin.yaml -n vault
+	$(HELM) repo add hashicorp https://helm.releases.hashicorp.com
+	$(HELM) upgrade vault hashicorp/vault -i --create-namespace -n vault --atomic -f ./integration/vault-values.yaml
+	$(KUBECTL) wait --for=condition=ready pod/vault-0 -n vault --timeout=5m
+
+.PHONY: kind-setup
+kind-setup: kind
+	$(KIND) delete cluster
+	$(KIND) create cluster --image docker.io/kindest/node:$(KUBECTL_VERSION) --config=./integration/cluster-kind.yaml
+
+
+.PHONY: ldap-setup 
+ldap-setup: kind-setup vault
+## Deploy LDAP Instance in ldap namespace
+	$(KUBECTL) create namespace ldap 
+	$(KUBECTL) apply -f ./integration/ldap -n ldap
+	$(KUBECTL) wait --for=condition=ready -n ldap pod $$($(KUBECTL) get pods -n ldap -l=app=ldap -o json | jq '.items[].metadata.name') --timeout=5m
+	$(KUBECTL) port-forward -n vault vault-0 8201:8200
+	$(KUBECTL) port-forward $$($(KUBECTL) get pods -n ldap -l=app=ldap -o json | jq '.items[].metadata.name') 8555:389 -n ldap
+	export VAULT_ADDR=http://localhost:8201
+	export VAULT_SKIP_VERIFY=true 
+	$(KUBECTL) apply -f ./test/ldapauthengine/ldap-auth-engine-mount.yaml
+	$(KUBECTL) apply -f ./test/ldapauthengine/ldap-auth-engine-config.yaml
+## Create new Group in LDAP
+	ldapadd -x -H ldap://localhost:8555 -D "cn=admin,dc=example,dc=com" -w admin -f ./integration/ldap/group.ldif
+## Create new Group in Vault LDAP Auth Engine
+	$(KUBECTL) apply -f ./test/ldapauthengine/ldap-auth-engine-group.yaml
+## Login with LDAP user (check database.ldiff for its membership)
+	$(VAULT) login -method=ldap -path=ldap/test/ username=trevor password=admin
+
+
 ##@ Build
 
+.PHONY: build
 build: generate fmt vet ## Build manager binary.
 	go build -o bin/manager main.go
 
+.PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./main.go
 
+.PHONY: docker-build
 docker-build: test ## Build docker image with the manager.
 	docker build -t ${IMG} .
 
+.PHONY: docker-push
 docker-push: ## Push docker image with the manager.
 	docker push ${IMG}
 
 ##@ Deployment
 
-install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl apply -f -
+ifndef ignore-not-found
+  ignore-not-found = false
+endif
 
-uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/crd | kubectl delete -f -
+.PHONY: install
+install: manifests kustomize kubectl ## Install CRDs into the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/crd | $(KUBECTL) apply -f -
 
-deploy: manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+.PHONY: uninstall
+uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/crd | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+
+.PHONY: deploy
+deploy: manifests kustomize kubectl ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	$(KUSTOMIZE) build config/default | $(KUBECTL) apply -f -
 
-undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/default | kubectl delete -f -
+.PHONY: undeploy
+undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
+	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 
-CONTROLLER_GEN = $(shell pwd)/bin/controller-gen
-controller-gen: ## Download controller-gen locally if necessary.
-	$(call go-get-tool,$(CONTROLLER_GEN),sigs.k8s.io/controller-tools/cmd/controller-gen@v0.6.1)
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
 
-KUSTOMIZE = $(shell pwd)/bin/kustomize
-kustomize: ## Download kustomize locally if necessary.
-	$(call go-get-tool,$(KUSTOMIZE),sigs.k8s.io/kustomize/kustomize/v3@v3.8.7)
+## Tool Binaries
+KUSTOMIZE ?= $(LOCALBIN)/kustomize
+CONTROLLER_GEN ?= $(LOCALBIN)/controller-gen
+ENVTEST ?= $(LOCALBIN)/setup-envtest
 
-ENVTEST = $(shell pwd)/bin/setup-envtest
-envtest: ## Download envtest-setup locally if necessary.
-	$(call go-get-tool,$(ENVTEST),sigs.k8s.io/controller-runtime/tools/setup-envtest@latest)
+KUSTOMIZE_VERSION ?= v3.8.7
+CONTROLLER_TOOLS_VERSION ?= v0.9.0
 
-# go-get-tool will 'go get' any package $2 and install it to $1.
-PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
-define go-get-tool
-@[ -f $(1) ] || { \
-set -e ;\
-TMP_DIR=$$(mktemp -d) ;\
-cd $$TMP_DIR ;\
-go mod init tmp ;\
-echo "Downloading $(2)" ;\
-GOBIN=$(PROJECT_DIR)/bin go get $(2) ;\
-rm -rf $$TMP_DIR ;\
-}
-endef
+.PHONY: controller-gen
+controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessary.
+$(CONTROLLER_GEN): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
+
+KUSTOMIZE_INSTALL_SCRIPT ?= "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh"
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
+$(KUSTOMIZE): $(LOCALBIN)
+	rm $(KUSTOMIZE) || true
+	curl -s $(KUSTOMIZE_INSTALL_SCRIPT) | bash -s -- $(subst v,,$(KUSTOMIZE_VERSION)) $(LOCALBIN)
+
+.PHONY: envtest
+envtest: $(ENVTEST) ## Download envtest-setup locally if necessary.
+$(ENVTEST): $(LOCALBIN)
+	GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-runtime/tools/setup-envtest@latest
 
 .PHONY: bundle
 bundle: manifests kustomize ## Generate bundle manifests and metadata, then validate generated files.
-	operator-sdk generate kustomize manifests -q
+	operator-sdk generate kustomize manifests --interactive=false -q
 	cd config/manager && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle -q --overwrite --version $(VERSION) $(BUNDLE_METADATA_OPTS)
+	$(KUSTOMIZE) build config/manifests | operator-sdk generate bundle $(BUNDLE_GEN_FLAGS)
 	operator-sdk bundle validate ./bundle
 
 .PHONY: bundle-build
@@ -174,7 +260,7 @@ ifeq (,$(shell which opm 2>/dev/null))
 	set -e ;\
 	mkdir -p $(dir $(OPM)) ;\
 	OS=$(shell go env GOOS) && ARCH=$(shell go env GOARCH) && \
-	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.15.1/$${OS}-$${ARCH}-opm ;\
+	curl -sSLo $(OPM) https://github.com/operator-framework/operator-registry/releases/download/v1.23.0/$${OS}-$${ARCH}-opm ;\
 	chmod +x $(OPM) ;\
 	}
 else
@@ -207,27 +293,118 @@ catalog-push: ## Push a catalog image.
 	$(MAKE) docker-push IMG=$(CATALOG_IMG)
 
 # Generate helm chart
-helmchart: kustomize manifests
+.PHONY: helmchart
+helmchart: helmchart-clean kustomize helm
 	mkdir -p ./charts/${OPERATOR_NAME}/templates
 	mkdir -p ./charts/${OPERATOR_NAME}/crds
+	repo=${OPERATOR_NAME} envsubst < ./config/local-development/tilt/env-replace-image.yaml > ./config/local-development/tilt/replace-image.yaml
 	$(KUSTOMIZE) build ./config/helmchart -o ./charts/${OPERATOR_NAME}/templates
 	sed -i 's/release-namespace/{{.Release.Namespace}}/' ./charts/${OPERATOR_NAME}/templates/*.yaml
-	rm ./charts/${OPERATOR_NAME}/templates/v1_namespace_release-namespace.yaml ./charts/${OPERATOR_NAME}/templates/apps_v1_deployment_vault-config-operator-controller-manager.yaml
+	rm ./charts/${OPERATOR_NAME}/templates/v1_namespace_release-namespace.yaml ./charts/${OPERATOR_NAME}/templates/apps_v1_deployment_${OPERATOR_NAME}-controller-manager.yaml
 	mv ./charts/${OPERATOR_NAME}/templates/apiextensions.k8s.io_v1_customresourcedefinition* ./charts/${OPERATOR_NAME}/crds
 	cp ./config/helmchart/templates/* ./charts/${OPERATOR_NAME}/templates
 	version=${VERSION} envsubst < ./config/helmchart/Chart.yaml.tpl  > ./charts/${OPERATOR_NAME}/Chart.yaml
 	version=${VERSION} image_repo=$${IMG%:*} envsubst < ./config/helmchart/values.yaml.tpl  > ./charts/${OPERATOR_NAME}/values.yaml
-	sed -i '1s/^/{{ if .Values.enableMonitoring }}/' ./charts/${OPERATOR_NAME}/templates/monitoring.coreos.com_v1_servicemonitor_vault-config-operator-controller-manager-metrics-monitor.yaml
-	echo {{ end }} >> ./charts/${OPERATOR_NAME}/templates/monitoring.coreos.com_v1_servicemonitor_vault-config-operator-controller-manager-metrics-monitor.yaml
-	helm lint ./charts/${OPERATOR_NAME}	
+	sed -i '1s/^/{{ if .Values.enableMonitoring }}/' ./charts/${OPERATOR_NAME}/templates/monitoring.coreos.com_v1_servicemonitor_${OPERATOR_NAME}-controller-manager-metrics-monitor.yaml
+	echo {{ end }} >> ./charts/${OPERATOR_NAME}/templates/monitoring.coreos.com_v1_servicemonitor_${OPERATOR_NAME}-controller-manager-metrics-monitor.yaml
+	$(HELM) lint ./charts/${OPERATOR_NAME}	
 
+.PHONY: helmchart-repo
 helmchart-repo: helmchart
 	mkdir -p ${HELM_REPO_DEST}/${OPERATOR_NAME}
-	helm package -d ${HELM_REPO_DEST}/${OPERATOR_NAME} ./charts/${OPERATOR_NAME}
-	helm repo index --url ${CHART_REPO_URL} ${HELM_REPO_DEST}
+	$(HELM) package -d ${HELM_REPO_DEST}/${OPERATOR_NAME} ./charts/${OPERATOR_NAME}
+	$(HELM) repo index --url ${CHART_REPO_URL} ${HELM_REPO_DEST}
 
+.PHONY: helmchart-repo-push
 helmchart-repo-push: helmchart-repo	
 	git -C ${HELM_REPO_DEST} add .
 	git -C ${HELM_REPO_DEST} status
 	git -C ${HELM_REPO_DEST} commit -m "Release ${VERSION}"
-	git -C ${HELM_REPO_DEST} push origin "gh-pages"	
+	git -C ${HELM_REPO_DEST} push origin "gh-pages"
+
+HELM_TEST_IMG_NAME ?= ${OPERATOR_NAME}
+HELM_TEST_IMG_TAG ?= helmchart-test
+
+# Deploy the helmchart to a kind cluster to test deployment.
+# If the test-metrics sidecar in the prometheus pod is ready, the metrics work and the test is successful.
+.PHONY: helmchart-test
+helmchart-test: kind-setup deploy-vault helmchart
+	$(MAKE) IMG=${HELM_TEST_IMG_NAME}:${HELM_TEST_IMG_TAG} docker-build
+	docker tag ${HELM_TEST_IMG_NAME}:${HELM_TEST_IMG_TAG} docker.io/library/${HELM_TEST_IMG_NAME}:${HELM_TEST_IMG_TAG}
+	$(KIND) load docker-image ${HELM_TEST_IMG_NAME}:${HELM_TEST_IMG_TAG} docker.io/library/${HELM_TEST_IMG_NAME}:${HELM_TEST_IMG_TAG}
+	$(HELM) repo add jetstack https://charts.jetstack.io
+	$(HELM) install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --version v1.7.1 --set installCRDs=true
+	$(HELM) repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	$(HELM) install kube-prometheus-stack prometheus-community/kube-prometheus-stack -n default -f integration/kube-prometheus-stack-values.yaml
+	$(HELM) install prometheus-rbac integration/helm/prometheus-rbac -n default
+	$(HELM) upgrade -i ${OPERATOR_NAME}-local charts/${OPERATOR_NAME} -n ${OPERATOR_NAME}-local --create-namespace \
+	  --set enableCertManager=true \
+	  --set image.repository=${HELM_TEST_IMG_NAME} \
+	  --set image.tag=${HELM_TEST_IMG_TAG} \
+	  --set env[0].name=VAULT_ADDR \
+	  --set env[0].value=http://vault.vault.svc:8200
+	$(KUBECTL) wait --namespace ${OPERATOR_NAME}-local --for=condition=ready pod --selector=app.kubernetes.io/name=${OPERATOR_NAME} --timeout=90s
+	$(KUBECTL) wait --namespace default --for=condition=ready pod prometheus-kube-prometheus-stack-prometheus-0 --timeout=180s
+	$(KUBECTL) exec prometheus-kube-prometheus-stack-prometheus-0 -n default -c test-metrics -- /bin/sh -c "echo 'Example metrics...' && cat /tmp/ready"
+
+.PHONY: helmchart-clean
+helmchart-clean:
+	rm -rf ./charts
+
+.PHONY: kind
+KIND = ./bin/kind
+kind: ## Download kind locally if necessary.
+ifeq (,$(wildcard $(KIND)))
+ifeq (,$(shell which kind 2>/dev/null))
+	$(call go-get-tool,$(KIND),sigs.k8s.io/kind@${KIND_VERSION})
+else
+KIND = $(shell which kind)
+endif
+endif
+
+.PHONY: kubectl
+KUBECTL = ./bin/kubectl
+kubectl: ## Download kubectl locally if necessary.
+ifeq (,$(wildcard $(KUBECTL)))
+ifeq (,$(shell which kubectl 2>/dev/null))
+	echo "Downloading ${KUBECTL} for managing k8s resources."
+	OS=$(shell go env GOOS) ;\
+	ARCH=$(shell go env GOARCH) ;\
+	curl --create-dirs -sSLo ${KUBECTL} https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/$${OS}/$${ARCH}/kubectl ;\
+	chmod +x ${KUBECTL}
+else
+KUBECTL = $(shell which kubectl)
+endif
+endif
+
+.PHONY: vault
+VAULT = ./bin/vault
+vault: ## Download vault cli locally if necessary.
+ifeq (,$(wildcard $(VAULT)))
+ifeq (,$(shell which vault 2>/dev/null))
+	echo "Downloading ${VAULT} cli."
+	OS=$(shell go env GOOS) ;\
+	ARCH=$(shell go env GOARCH) ;\
+	curl --create-dirs -sSLo ${VAULT}.zip https://releases.hashicorp.com/vault/${VAULT_VERSION}/vault_${VAULT_VERSION}_linux_amd64.zip ;\
+	unzip ${VAULT}.zip -d ./bin/ ;\
+	chmod +x ${VAULT}
+else
+VAULT = $(shell which vault)
+endif
+endif
+
+.PHONY: helm
+HELM = ./bin/helm
+helm: ## Download helm locally if necessary.
+ifeq (,$(wildcard $(HELM)))
+ifeq (,$(shell which helm 2>/dev/null))
+	echo "Downloading ${HELM}."
+	OS=$(shell go env GOOS) ;\
+	ARCH=$(shell go env GOARCH) ;\
+	curl --create-dirs -sSLo ${HELM}.tar.gz https://get.helm.sh/helm-${HELM_VERSION}-$${OS}-$${ARCH}.tar.gz ;\
+	tar -xf ${HELM}.tar.gz -C ./bin/ ;\
+	mv ./bin/$${OS}-$${ARCH}/helm ${HELM}
+else
+HELM = $(shell which helm)
+endif
+endif
